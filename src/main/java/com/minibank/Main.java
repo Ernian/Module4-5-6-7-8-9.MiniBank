@@ -1,11 +1,21 @@
 package com.minibank;
 
+import com.minibank.entity.Account;
+import com.minibank.entity.Client;
+import com.minibank.service.AccountService;
+import com.minibank.service.BankService;
+import com.minibank.service.ClientService;
+import com.minibank.service.TransactionService;
+
 import java.math.BigDecimal;
 
 public class Main {
 
     public static void main(String[] args) {
-        BankService bank = new BankService();
+        ClientService clientService = new ClientService();
+        AccountService accountService = new AccountService();
+        TransactionService transactionService = new TransactionService();
+        BankService bank = new BankService(clientService, accountService, transactionService);
 
         Client client = bank.registerClient("Ivan Petrov", "ivan@example.com");
         Account account1 = bank.openAccount(client.getId(), "ACC-001");
@@ -15,7 +25,7 @@ public class Main {
         // для демо просто задаём баланс напрямую через первый перевод
         // от несуществующего служебного счёта нет смысла эмулировать,
         // поэтому просто выставим баланс через пакетный доступ в демо:
-        account1.setBalance(new BigDecimal("1000.00"));
+        accountService.updateBalance(account1.getId(),  new BigDecimal("1000.00"));
 
         System.out.println("=== Обычный перевод ===");
         bank.transfer(account1.getId(), account2.getId(), new BigDecimal("100.00"));
