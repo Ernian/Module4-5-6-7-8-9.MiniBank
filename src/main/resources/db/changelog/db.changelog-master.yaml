@@ -1,3 +1,7 @@
 databaseChangeLog:
   - include:
-      file: src/main/resources/db/changelog/changeset/V1__initial_schema.sql
+      file: changeset/V1__initial_schema.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changeset/V2__create_index_for_search_transactions.sql
+      relativeToChangelogFile: true
