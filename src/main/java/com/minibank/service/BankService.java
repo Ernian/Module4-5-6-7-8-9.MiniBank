@@ -40,7 +40,7 @@ public class BankService {
         return clientService.getClient(clientId);
     }
 
-    public void transfer(Long fromAccountId, Long toAccountId, BigDecimal amount) {
+    public boolean transfer(Long fromAccountId, Long toAccountId, BigDecimal amount) {
         Account from = getAccount(fromAccountId);
         Account to = getAccount(toAccountId);
 
@@ -48,11 +48,13 @@ public class BankService {
 
         BigDecimal newFromBalance = from.getBalance().subtract(amount);
         accountService.updateBalance(fromAccountId, newFromBalance);
-        recordTransaction(fromAccountId, amount.negate(), "TRANSFER_OUT");
+        boolean successOut = recordTransaction(fromAccountId, amount.negate(), "TRANSFER_OUT");
 
         BigDecimal newToBalance = to.getBalance().add(amount);
         accountService.updateBalance(toAccountId, newToBalance);
-        recordTransaction(toAccountId, amount, "TRANSFER_IN");
+        boolean successIn = recordTransaction(toAccountId, amount, "TRANSFER_IN");
+
+        return successOut && successIn;
     }
 
     private static void checkTransfer(Account from, BigDecimal amount) {
@@ -61,7 +63,7 @@ public class BankService {
         }
     }
 
-    private void recordTransaction(Long accountId, BigDecimal amount, String type) {
-        transactionService.recordTransaction(accountId, amount, type);
+    private boolean recordTransaction(Long accountId, BigDecimal amount, String type) {
+        return transactionService.recordTransaction(accountId, amount, type);
     }
 }
