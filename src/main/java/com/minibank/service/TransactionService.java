@@ -6,7 +6,7 @@ import java.math.BigDecimal;
 import java.sql.SQLException;
 
 public class TransactionService {
-    public void recordTransaction(Long accountId, BigDecimal amount, String type) {
+    public boolean recordTransaction(Long accountId, BigDecimal amount, String type) {
         String sql = "INSERT INTO transactions (account_id, amount, type) VALUES (?, ?, ?)";
 
         try (
@@ -17,7 +17,8 @@ public class TransactionService {
             ps.setBigDecimal(2, amount);
             ps.setString(3, type);
 
-            ps.executeUpdate();
+            int rowsAffected  = ps.executeUpdate();
+            return rowsAffected  == 1;
         } catch (SQLException e) {
             throw new RuntimeException(e.getMessage(), e);
         }
