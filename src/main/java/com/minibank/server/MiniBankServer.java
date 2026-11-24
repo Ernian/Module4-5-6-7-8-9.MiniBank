@@ -11,7 +11,9 @@ import java.net.InetSocketAddress;
 
 public class MiniBankServer {
     private static final int PORT = 8080;
-    private static final String PATH = "/transfer";
+    private static final String CLIENT_PATH = "/client";
+    private static final String ACCOUNT_PATH = "/account";
+    private static final String TRANSFER_PATH = "/transfer";
 
 
     public static void main(String[] args) throws IOException {
@@ -26,7 +28,9 @@ public class MiniBankServer {
         TransferRequestValidator validator = new TransferRequestValidator();
 
         HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
-        server.createContext(PATH, new TransferHandler(bankService,validator));
+        server.createContext(CLIENT_PATH, new ClientHandler(bankService));
+        server.createContext(ACCOUNT_PATH, new AccountHandler(bankService));
+        server.createContext(TRANSFER_PATH, new TransferHandler(bankService, validator));
 
         server.start();
     }
