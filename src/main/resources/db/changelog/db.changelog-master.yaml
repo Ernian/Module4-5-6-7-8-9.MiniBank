@@ -5,3 +5,6 @@ databaseChangeLog:
   - include:
       file: changeset/V2__create_index_for_search_transactions.sql
       relativeToChangelogFile: true
+  - include:
+      file: changeset/V3__add_unique_constrain_for_account_number.sql
+      relativeToChangelogFile: true

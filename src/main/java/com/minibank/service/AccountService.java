@@ -1,37 +1,31 @@
 package com.minibank.service;
 
 import com.minibank.entity.Account;
-import com.minibank.factory.ConnectionFactory;
+import com.minibank.entity.Client;
+import com.minibank.factory.EntityManagerFactory;
+import jakarta.persistence.EntityTransaction;
 
 import java.math.BigDecimal;
-import java.sql.SQLException;
 
 public class AccountService {
 
     public Account openAccount(Long clientId, String accountNumber, BigDecimal balance) {
-        String sql = "INSERT INTO accounts (client_id, account_number, balance) VALUES (?, ?, ?) RETURNING id";
+        EntityTransaction entityTransaction = null;
 
-        try (
-                var connection = ConnectionFactory.getConnection();
-                var ps = connection.prepareStatement(sql)
-        ) {
-            ps.setLong(1, clientId);
-            ps.setString(2, accountNumber);
-            ps.setBigDecimal(3, balance);
+        try (var entityManager = EntityManagerFactory.getEntityManager()) {
+            entityTransaction = entityManager.getTransaction();
+            entityTransaction.begin();
 
-            try (var resultSet = ps.executeQuery()) {
-                if (resultSet.next()) {
-                    return new Account(
-                            resultSet.getLong("id"),
-                            clientId,
-                            accountNumber,
-                            balance
-                    );
-                }
-                throw new RuntimeException("Failed to create an account");
+            Client client = entityManager.find(Client.class, clientId);
+            Account account = new Account(client, accountNumber, balance);
+            entityManager.persist(account);
+            entityTransaction.commit();
+
+            return account;
+        } catch (Exception e) {
+            if (entityTransaction != null) {
+                entityTransaction.rollback();
             }
-
-        } catch (SQLException e) {
             throw new RuntimeException(e.getMessage(), e);
         }
     }
@@ -41,42 +35,24 @@ public class AccountService {
     }
 
     public Account getAccount(Long accountId) {
-        String sql = "SELECT id, client_id, account_number, balance FROM accounts WHERE id = ?";
-
-        try (
-                var connection = ConnectionFactory.getConnection();
-                var ps = connection.prepareStatement(sql)
-        ) {
-            ps.setLong(1, accountId);
-
-            try (var resultSet = ps.executeQuery()) {
-                if (resultSet.next()) {
-                    return new Account(
-                            accountId,
-                            resultSet.getLong("client_id"),
-                            resultSet.getString("account_number"),
-                            resultSet.getBigDecimal("balance")
-                    );
-                }
-                throw new IllegalArgumentException("Account not found: " + accountId);
-            }
-
-        } catch (SQLException e) {
-            throw new RuntimeException(e.getMessage(), e);
+        try (var entityManager = EntityManagerFactory.getEntityManager()) {
+            return entityManager.find(Account.class, accountId);
         }
     }
 
     public void updateBalance(Long accountId, BigDecimal balance) {
-        String sql = "UPDATE accounts SET balance = ? WHERE id = ?";
+        EntityTransaction entityTransaction = null;
 
-        try (
-                var connection = ConnectionFactory.getConnection();
-                var ps = connection.prepareStatement(sql)
-        ) {
-            ps.setBigDecimal(1, balance);
-            ps.setLong(2, accountId);
-            ps.executeUpdate();
-        } catch (SQLException e) {
+        try (var entityManager = EntityManagerFactory.getEntityManager()) {
+            entityTransaction = entityManager.getTransaction();
+            entityTransaction.begin();
+            Account account = entityManager.find(Account.class, accountId);
+            account.setBalance(balance);
+            entityTransaction.commit();
+        } catch (Exception e) {
+            if (entityTransaction != null) {
+                entityTransaction.rollback();
+            }
             throw new RuntimeException(e.getMessage(), e);
         }
     }

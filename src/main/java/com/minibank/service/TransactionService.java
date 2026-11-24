@@ -1,25 +1,32 @@
 package com.minibank.service;
 
-import com.minibank.factory.ConnectionFactory;
+import com.minibank.entity.Account;
+import com.minibank.entity.Transaction;
+import com.minibank.factory.EntityManagerFactory;
+import jakarta.persistence.EntityTransaction;
+
 
 import java.math.BigDecimal;
-import java.sql.SQLException;
 
 public class TransactionService {
     public boolean recordTransaction(Long accountId, BigDecimal amount, String type) {
-        String sql = "INSERT INTO transactions (account_id, amount, type) VALUES (?, ?, ?)";
+        EntityTransaction entityTransaction = null;
 
-        try (
-                var connection = ConnectionFactory.getConnection();
-                var ps = connection.prepareStatement(sql)
-        ) {
-            ps.setLong(1, accountId);
-            ps.setBigDecimal(2, amount);
-            ps.setString(3, type);
+        try (var entityManager = EntityManagerFactory.getEntityManager()) {
+            entityTransaction = entityManager.getTransaction();
+            entityTransaction.begin();
 
-            int rowsAffected  = ps.executeUpdate();
-            return rowsAffected  == 1;
-        } catch (SQLException e) {
+            Account account = entityManager.find(Account.class, accountId);
+            var tr = new Transaction(account, amount, type);
+            entityManager.persist(tr);
+            entityTransaction.commit();
+
+            return true;
+        } catch (Exception e) {
+            if (entityTransaction != null) {
+                entityTransaction.rollback();
+            }
+
             throw new RuntimeException(e.getMessage(), e);
         }
     }
