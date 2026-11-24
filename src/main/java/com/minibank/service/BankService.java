@@ -2,8 +2,13 @@ package com.minibank.service;
 
 import com.minibank.entity.Account;
 import com.minibank.entity.Client;
+import com.minibank.entity.Transaction;
+import com.minibank.factory.EntityManagerFactory;
+import com.minibank.server.dto.ClientDto;
+import jakarta.persistence.EntityTransaction;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public class BankService {
     private final ClientService clientService;
@@ -41,20 +46,31 @@ public class BankService {
     }
 
     public boolean transfer(Long fromAccountId, Long toAccountId, BigDecimal amount) {
-        Account from = getAccount(fromAccountId);
-        Account to = getAccount(toAccountId);
+        try (var entityManager = EntityManagerFactory.getEntityManager()) {
+            var entityTransaction = entityManager.getTransaction();
+            entityTransaction.begin();
 
-        checkTransfer(from, amount);
+            try {
+                Account from = entityManager.find(Account.class, fromAccountId);
+                Account to = entityManager.find(Account.class, toAccountId);
 
-        BigDecimal newFromBalance = from.getBalance().subtract(amount);
-        accountService.updateBalance(fromAccountId, newFromBalance);
-        boolean successOut = recordTransaction(fromAccountId, amount.negate(), "TRANSFER_OUT");
+                checkTransfer(from, amount);
 
-        BigDecimal newToBalance = to.getBalance().add(amount);
-        accountService.updateBalance(toAccountId, newToBalance);
-        boolean successIn = recordTransaction(toAccountId, amount, "TRANSFER_IN");
+                from.setBalance(from.getBalance().subtract(amount));
+                entityManager.persist(new Transaction(
+                        from, amount.negate(), "TRANSFER_OUT"));
 
-        return successOut && successIn;
+                to.setBalance(to.getBalance().add(amount));
+                entityManager.persist(new Transaction(
+                        to, amount, "TRANSFER_IN"));
+
+                entityTransaction.commit();
+                return true;
+            } catch (Exception e) {
+                entityTransaction.rollback();
+                throw new RuntimeException(e.getMessage(), e);
+            }
+        }
     }
 
     private static void checkTransfer(Account from, BigDecimal amount) {
@@ -63,7 +79,24 @@ public class BankService {
         }
     }
 
-    private boolean recordTransaction(Long accountId, BigDecimal amount, String type) {
-        return transactionService.recordTransaction(accountId, amount, type);
+    private boolean recordTransaction(Account account, BigDecimal amount, String type) {
+        return transactionService.recordTransaction(account.getId(), amount, type);
+    }
+
+    public List<ClientDto> getAllClientsDto() {
+        try (var entityManager = EntityManagerFactory.getEntityManager()) {
+            EntityTransaction entityTransaction = entityManager.getTransaction();
+            entityTransaction.begin();
+            List<Client> clients = entityManager
+                    .createQuery("SELECT c FROM Client c JOIN FETCH c.accounts", Client.class)
+                    .getResultList();
+
+            List<ClientDto> dtoList = clients.stream()
+                    .map(ClientDto::fromEntity)
+                    .toList();
+
+            entityTransaction.commit();
+            return dtoList;
+        }
     }
 }
