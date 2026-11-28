@@ -1,67 +1,74 @@
 package com.minibank.service;
 
+import com.minibank.dto.TransferRequest;
+import com.minibank.dto.TransferResponse;
 import com.minibank.entity.Account;
-import com.minibank.entity.Client;
+import com.minibank.entity.Transaction;
+import com.minibank.entity.TransactionType;
+import com.minibank.repository.AccountRepository;
+import com.minibank.repository.TransactionRepository;
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.transaction.Transactional;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
+@Service
 public class BankService {
-    private final ClientService clientService;
-    private final AccountService accountService;
-    private final TransactionService transactionService;
+    private final AccountRepository accountRepository;
+    private final TransactionRepository transactionRepository;
 
     public BankService(
-            ClientService clientService,
-            AccountService accountService,
-            TransactionService transactionService
+            AccountRepository accountRepository,
+            TransactionRepository transactionRepository
     ) {
-        this.clientService = clientService;
-        this.accountService = accountService;
-        this.transactionService = transactionService;
+        this.accountRepository = accountRepository;
+        this.transactionRepository = transactionRepository;
     }
 
-    public Client registerClient(String name, String email) {
-        return clientService.registerClient(name, email);
+    @Transactional
+    public TransferResponse transfer(TransferRequest request) {
+        Account fromAccount = getAccountById(request.fromAccountId());
+        Account toAccount = getAccountById(request.toAccountId());
+
+        BigDecimal fromBalance = fromAccount.getBalance();
+        BigDecimal toBalance = toAccount.getBalance();
+        BigDecimal amount = request.amount();
+
+        fromAccount.setBalance(fromBalance.subtract(amount));
+        toAccount.setBalance(toBalance.add(amount));
+
+        Transaction transactionOut = new Transaction(
+                fromAccount,
+                amount.negate(),
+                TransactionType.TRANSFER_OUT
+        );
+
+        Transaction transactionIn = new Transaction(
+                toAccount,
+                amount,
+                TransactionType.TRANSFER_IN
+        );
+
+        accountRepository.save(fromAccount);
+        accountRepository.save(toAccount);
+        transactionRepository.save(transactionOut);
+        transactionRepository.save(transactionIn);
+
+        return new TransferResponse(
+                true,
+                request.fromAccountId(),
+                request.toAccountId(),
+                amount,
+                LocalDateTime.now().toString()
+        );
     }
 
-    public Account openAccount(Long clientId, String accountNumber) {
-        return accountService.openAccount(clientId, accountNumber);
-    }
-
-    public Account openAccount(Long clientId, String accountNumber, BigDecimal balance) {
-        return accountService.openAccount(clientId, accountNumber, balance);
-    }
-
-    public Account getAccount(Long accountId) {
-        return accountService.getAccount(accountId);
-    }
-
-    public Client getClient(Long clientId) {
-        return clientService.getClient(clientId);
-    }
-
-    public void transfer(Long fromAccountId, Long toAccountId, BigDecimal amount) {
-        Account from = getAccount(fromAccountId);
-        Account to = getAccount(toAccountId);
-
-        checkTransfer(from, amount);
-
-        BigDecimal newFromBalance = from.getBalance().subtract(amount);
-        accountService.updateBalance(fromAccountId, newFromBalance);
-        recordTransaction(fromAccountId, amount.negate(), "TRANSFER_OUT");
-
-        BigDecimal newToBalance = to.getBalance().add(amount);
-        accountService.updateBalance(toAccountId, newToBalance);
-        recordTransaction(toAccountId, amount, "TRANSFER_IN");
-    }
-
-    private static void checkTransfer(Account from, BigDecimal amount) {
-        if (from.getBalance().compareTo(amount) < 0) {
-            throw new IllegalStateException("Insufficient funds on account " + from.getId());
-        }
-    }
-
-    private void recordTransaction(Long accountId, BigDecimal amount, String type) {
-        transactionService.recordTransaction(accountId, amount, type);
+    private Account getAccountById(Long id) {
+        return accountRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        String.format("Account with id %d not found", id)
+                ));
     }
 }

@@ -1,27 +1,81 @@
 package com.minibank.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Temporal;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+@Entity
+@Table(name = "transactions")
 public class Transaction {
+    @Id
+    @SequenceGenerator(
+            name = "transaction_seq_gen",
+            sequenceName = "transactions_id_seq",
+            allocationSize = 1
+    )
+    @GeneratedValue(
+            strategy = GenerationType.SEQUENCE,
+            generator = "transaction_seq_gen"
+    )
+    private Long id;
 
-    private final Long id;
-    private final Long accountId;
-    private final BigDecimal amount;
-    private final String type;
-    private final LocalDateTime timestamp;
+    @Column(name = "amount", nullable = false)
+    private BigDecimal amount;
 
-    public Transaction(Long id, Long accountId, BigDecimal amount, String type, LocalDateTime timestamp) {
-        this.id = id;
-        this.accountId = accountId;
-        this.amount = amount;
-        this.type = type;
-        this.timestamp = timestamp;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
+    private TransactionType type;
+
+    @Temporal
+    @CreationTimestamp
+    @Column(name = "transaction_date", nullable = false)
+    private LocalDateTime timestamp;
+
+    @ManyToOne
+    @JsonIgnore
+    @JoinColumn(name = "account_id", nullable = false)
+    private Account account;
+
+    public Transaction() {
     }
 
-    public Long getId() { return id; }
-    public Long getAccountId() { return accountId; }
-    public BigDecimal getAmount() { return amount; }
-    public String getType() { return type; }
-    public LocalDateTime getTimestamp() { return timestamp; }
+    public Transaction(Account account, BigDecimal amount, TransactionType type) {
+        this.account = account;
+        this.amount = amount;
+        this.type = type;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Account getAccount() {
+        return account;
+    }
+
+    public BigDecimal getAmount() {
+        return amount;
+    }
+
+    public TransactionType getType() {
+        return type;
+    }
+
+    public LocalDateTime getTimestamp() {
+        return timestamp;
+    }
 }

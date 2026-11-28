@@ -1,55 +1,33 @@
 package com.minibank.service;
 
+import com.minibank.dto.ClientDto;
 import com.minibank.entity.Client;
-import com.minibank.factory.ConnectionFactory;
+import com.minibank.repository.ClientRepository;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.stereotype.Service;
 
-import java.sql.SQLException;
-
+@Service
 public class ClientService {
-    public Client registerClient(String name, String email) {
-        String sql = "INSERT INTO clients (name, email) VALUES (?, ?) RETURNING id";
+    private final ClientRepository clientRepository;
 
-        try (
-                var connection = ConnectionFactory.getConnection();
-                var ps = connection.prepareStatement(sql)
-        ) {
-            ps.setString(1, name);
-            ps.setString(2, email);
-
-            try (var resultSet = ps.executeQuery()) {
-                if (resultSet.next()) {
-                    return new Client(resultSet.getLong("id"), name, email);
-                }
-                throw new RuntimeException("Failed to create a user");
-            }
-
-        } catch (SQLException e) {
-            throw new RuntimeException(e.getMessage(), e);
-        }
+    public ClientService(ClientRepository clientRepository) {
+        this.clientRepository = clientRepository;
     }
 
-    public Client getClient(Long clientId) {
-        String sql = "SELECT id, name, email FROM clients WHERE id = ?";
+    public ClientDto findById(long id) {
+        Client client = clientRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        String.format("Client with id %d not found", id)
+                ));
 
-        try (
-                var connection = ConnectionFactory.getConnection();
-                var ps = connection.prepareStatement(sql)
-        ) {
-            ps.setLong(1, clientId);
+        return ClientDto.fromEntity(client);
+    }
 
-            try (var resultSet = ps.executeQuery()) {
-                if (resultSet.next()) {
-                    return new Client(
-                            resultSet.getLong("id"),
-                            resultSet.getString("name"),
-                            resultSet.getString("email")
-                    );
-                }
-                throw new IllegalArgumentException("Client not found: " + clientId);
-            }
+    public ClientDto registerClient(ClientDto clientDto) {
+        Client savedClient = clientRepository.save(
+                ClientDto.toEntity(clientDto)
+        );
 
-        } catch (SQLException e) {
-            throw new RuntimeException(e.getMessage(), e);
-        }
+        return ClientDto.fromEntity(savedClient);
     }
 }
